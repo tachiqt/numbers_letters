@@ -1,0 +1,4 @@
+num_numbers=116
+num_letters=26
+num_gloss=142
+num_cat=2

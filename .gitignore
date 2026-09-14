@@ -1,0 +1,11 @@
+﻿# Local downloads and training artifacts
+raw/numbers/**
+!raw/numbers/.gitkeep
+data/**
+!data/.gitkeep
+trained_models/**
+!trained_models/.gitkeep
+!trained_models/*.pt
+__pycache__/
+*.pyc
+.venv/
