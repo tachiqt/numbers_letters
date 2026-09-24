@@ -1,100 +1,61 @@
-# Numbers + Letters specialist
+# Numbers + Letters (FSL specialist)
 
-Public specialist pack: **labels, training scripts, Streamlit, and checkpoints** for all Drive numbers + A–Z.
+Training pack for **Filipino Sign Language numbers + LETTER_A–Z** (MediaPipe Holistic LSTM).
 
-Phrases stay on the main FSL-105 model. This specialist is numbers + letters only.
+This is **dataset + training only** — not the full HandSpeak / Streamlit app.
 
-### Where this folder belongs
-
-Clone or copy this repo into your [fslr-transformer-vs-iv3gru](https://github.com/remi-9/fslr-transformer-vs-iv3gru) checkout as:
+Parent training code lives in [fslr-transformer-vs-iv3gru](https://github.com/remi-9/fslr-transformer-vs-iv3gru). Place this folder at:
 
 `specialists/numbers_letters/`
 
-Training and Streamlit import models/preprocessing from that parent repo. Raw Drive videos and built NPZs are **not** in git (see `.gitignore`) — download numbers locally, then follow the steps below.
+## What’s included
 
-## Layout
+| Path | Contents |
+|------|----------|
+| `data/train/`, `data/val/` | Holistic NPZ `[T,178]` + CSVs (Drive numbers + japorton alphabet + FSL ONE–TEN) |
+| `labels_reference.csv` | 116 numbers + 26 letters = **142** glosses |
+| `prepare_dataset.py` | Build / refresh the specialist pack |
+| `train.py` | Transfer-learn MediaPipe-LSTM from FSL-105 |
+| `eval_static_letters.py` | Eval on japorton static letter NPZs |
+| `trained_models/MediaPipeLSTM_best.pt` | Best checkpoint (~59% val gloss) |
 
-```
-specialists/numbers_letters/
-  drive_number_classes.txt  ← full Drive number inventory
-  labels_reference.csv      ← 116 numbers + 26 letters
-  prepare_dataset.py
-  train.py
-  streamlit_app.py
-  run_streamlit.bat
-  data/                     ← train/val NPZs + CSVs
-  trained_models/           ← MediaPipeLSTM_best.pt
-  raw/numbers/              ← put your Drive download here
-  README.md
-```
+**Not included:** Streamlit UI, API, mobile app, raw Drive/Kaggle video downloads.
 
-## 1. Download numbers from Drive (manual)
+## Vocab
 
-Download the Drive **numbers** folder yourself, then place it so class folders sit directly under:
+- Gloss IDs `0…115` — numbers (ONE–TEN + Drive classes)
+- Gloss IDs `116…141` — `LETTER_A` … `LETTER_Z`
+- Categories: `0=NUMBER`, `1=ALPHABET`
 
-`specialists/numbers_letters/raw/numbers/`
-
-Expected layout:
-
-```
-raw/numbers/
-  11/*.mp4
-  12/*.mp4
-  ...
-  100/*.mp4
-  1000/*.mp4
-  ...
-```
-
-If Drive gives you an extra wrapper (e.g. `numbers/numbers/11/...`), move the inner class folders up so `11`, `12`, … are immediate children of `raw/numbers/`.
-
-You can overwrite any partial automatic download in that folder.
-
-ONE–TEN are not required in Drive; they are supplemented from FSL during `prepare_dataset.py`.
-
-## 2. Build NPZs + CSVs
-
-From the **repo root**:
+## Train (from parent repo root)
 
 ```powershell
-cd "C:\Users\Mark Vincent Perez\OneDrive\Desktop\videos\fslr-transformer-vs-iv3gru"
-.\.venv\Scripts\python.exe specialists\numbers_letters\prepare_dataset.py --preprocess-drive
+cd path\to\fslr-transformer-vs-iv3gru
+# optional: rebuild from local numbers videos + alphabet NPZs
+.\.venv\Scripts\python.exe specialists\numbers_letters\prepare_dataset.py `
+  --numbers-root "PATH\to\numbers" --reuse-drive-npz --max-per-class 250
+
+.\.venv\Scripts\python.exe specialists\numbers_letters\train.py --epochs 400 --batch-size 16
 ```
 
-This scans every class under `raw/numbers/`, extracts Holistic features, merges alphabet NPZs + FSL ONE–TEN, and writes `data/` + `labels_reference.csv`.
+Requires a pretrained FSL-105 MediaPipe-LSTM at:
 
-## 3. Train (checkpoints stay in this folder)
+`trained_models/mediapipe_lstm/FSL105_classification/MediaPipeLSTM_best.pt`
+
+## Eval static letters
+
+Alphabet Holistic NPZs must exist under parent `data/processed/alphabet_val/` (from japorton via `scripts/transfer_learning/`).
 
 ```powershell
-.\.venv\Scripts\python.exe specialists\numbers_letters\train.py --epochs 40 --batch-size 16
+.\.venv\Scripts\python.exe specialists\numbers_letters\eval_static_letters.py --split val
 ```
 
-Output: `specialists/numbers_letters/trained_models/MediaPipeLSTM_best.pt`
+## Data sources
 
-## 4. Streamlit (this specialist only)
+1. **Numbers** — local Drive / FSL-105 number clips (not in git; use `--numbers-root`)
+2. **Letters** — [japorton/fsl-dataset](https://www.kaggle.com/datasets/japorton/fsl-dataset) (+ optional J/Z videos)
+3. **ONE–TEN** — FSL-105 processed NPZs when Drive starts at 11+
 
-```powershell
-.\specialists\numbers_letters\run_streamlit.bat
-```
+## License / note
 
-Or:
-
-```powershell
-$env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m streamlit run specialists\numbers_letters\streamlit_app.py --server.port 8505
-```
-
-Open **http://localhost:8505** — NPZ or video upload for numbers/letters only.
-
-Main Pansinayan app (port 8503) remains for FSL phrases.
-
-## Label map (local)
-
-| Local id | Label |
-|----------|--------|
-| 0–9 | ONE … TEN (FSL supplement) |
-| 10–115 | Drive numbers 11–99, hundreds, thousands, million/billion/trillion |
-| 116–141 | LETTER_A … LETTER_Z |
-
-Exact list: `drive_number_classes.txt` + `labels_reference.csv`.  
-Categories: `0=NUMBER`, `1=ALPHABET`.
+Research / demo pack. Letter stills are japorton; number clips remain with your local Drive rights.

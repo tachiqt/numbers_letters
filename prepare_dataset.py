@@ -122,7 +122,16 @@ def _label_sort_key(label: str) -> tuple:
     return (1, 10**18, lab)
 
 
-def find_numbers_root() -> Path | None:
+def find_numbers_root(explicit: Path | None = None) -> Path | None:
+    """Resolve numbers class-folder root. Prefer --numbers-root when given."""
+    if explicit is not None:
+        root = explicit.expanduser().resolve()
+        if not root.exists() or not root.is_dir():
+            raise SystemExit(f"--numbers-root not found or not a directory: {root}")
+        if not any(root.iterdir()):
+            raise SystemExit(f"--numbers-root is empty: {root}")
+        return root
+
     candidates = [
         SPEC / "raw" / "numbers",
         SPEC / "raw" / "drive_download" / "numbers",
@@ -578,9 +587,23 @@ def main() -> None:
         action="store_true",
         help="Only rebuild labels/CSV from already-preprocessed drive NPZs if present",
     )
+    parser.add_argument(
+        "--reuse-drive-npz",
+        action="store_true",
+        help=(
+            "Restore Drive number NPZs from data/_drive_cache (train/val + CSVs) "
+            "instead of re-running Holistic on videos"
+        ),
+    )
+    parser.add_argument(
+        "--numbers-root",
+        type=Path,
+        default=None,
+        help="Absolute path to numbers class folders (e.g. FSL-105/clips/.../numbers)",
+    )
     args = parser.parse_args()
 
-    numbers_root = find_numbers_root()
+    numbers_root = find_numbers_root(args.numbers_root)
     videos_by_label: dict[str, list[Path]] = {}
     if numbers_root:
         print(f"[scan] numbers root: {numbers_root}")
@@ -590,9 +613,8 @@ def main() -> None:
             print(f"  {lab}: {len(paths)} videos")
     else:
         print(
-            "[warn] No Drive numbers folder yet. "
-            "Place under specialists/numbers_letters/raw/numbers/ "
-            "or wait for download. Falling back to FSL ONE–TEN + Drive manifest."
+            "[warn] No numbers folder yet. Pass --numbers-root PATH, or place under "
+            "specialists/numbers_letters/raw/numbers/. Falling back to FSL ONE–TEN + manifest."
         )
 
     # Always include the full Drive inventory (even if videos not downloaded yet)
@@ -640,7 +662,36 @@ def main() -> None:
     val_rows: list[dict] = []
 
     drive_has_videos = any(len(v) > 0 for v in videos_by_label.values())
-    if drive_has_videos and args.preprocess_drive and not args.skip_drive_preprocess:
+    cache_root = SPEC / "data" / "_drive_cache"
+    if args.reuse_drive_npz:
+        print(f"\n[reuse] Restoring Drive number NPZs from {cache_root}")
+        restored = 0
+        for split, rows in (("train", train_rows), ("val", val_rows)):
+            csv_path = cache_root / f"{split}.csv"
+            src_dir = cache_root / split
+            out_dir = SPEC / "data" / split
+            if not csv_path.exists():
+                print(f"[reuse] missing {csv_path}")
+                continue
+            with csv_path.open(newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    stem = row["file"]
+                    src = src_dir / f"{stem}.npz"
+                    if not _link(src, out_dir / f"{stem}.npz"):
+                        continue
+                    rows.append(
+                        {
+                            "file": stem,
+                            "gloss": row["gloss"],
+                            "cat": row.get("cat", "0"),
+                            "occluded": row.get("occluded", "0"),
+                            "signer": row.get("signer", "DRIVE"),
+                            "duration": row.get("duration", "1.0"),
+                        }
+                    )
+                    restored += 1
+        print(f"[reuse] restored {restored} Drive number samples")
+    elif drive_has_videos and args.preprocess_drive and not args.skip_drive_preprocess:
         print("\n[preprocess] Drive number videos → Holistic NPZ…")
         d_train, d_val = preprocess_videos(
             videos_by_label,
@@ -671,7 +722,7 @@ def main() -> None:
     elif drive_has_videos and not args.preprocess_drive:
         print(
             "\n[note] Drive videos found but --preprocess-drive not set. "
-            "Labels updated; re-run with --preprocess-drive to extract NPZs."
+            "Labels updated; re-run with --preprocess-drive or --reuse-drive-npz."
         )
 
     # Always add alphabet

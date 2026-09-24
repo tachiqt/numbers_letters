@@ -7,7 +7,7 @@ Train numbers+letters specialist MediaPipe-LSTM.
 
 Usage (from repo root, after prepare_dataset.py):
 
-  .\\.venv\\Scripts\\python.exe specialists\\numbers_letters\\train.py --epochs 40 --batch-size 16
+  .\\.venv\\Scripts\\python.exe specialists\\numbers_letters\\train.py --epochs 400 --batch-size 16
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ def main() -> None:
         default=SPEC / "trained_models",
         help="Checkpoints stay inside specialists/numbers_letters/trained_models",
     )
-    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--epochs", type=int, default=400)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--backbone-lr", type=float, default=1e-5)
@@ -175,27 +175,13 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     unfreeze_all(model)
-    # Prefer lower LR on backbone via param groups in bootstrap optimizer
-    backbone_params = []
-    head_params = []
-    for name, p in model.named_parameters():
-        if name.startswith("gloss_head") or name.startswith("category_head"):
-            head_params.append(p)
-        else:
-            backbone_params.append(p)
-    opt = torch.optim.AdamW(
-        [
-            {"params": backbone_params, "lr": args.backbone_lr},
-            {"params": head_params, "lr": args.lr},
-        ],
-        weight_decay=args.weight_decay,
-    )
+    # Optimizer must be None: training.train builds a single param-group AdamW.
     boot_path = args.output_dir / "MediaPipeLSTM_numbers_letters_init.pt"
     torch.save(
         {
             "epoch": 0,
             "model": model.state_dict(),
-            "optimizer": opt.state_dict(),
+            "optimizer": None,
             "scaler": None,
             "scheduler": None,
             "best_metric": -1.0,

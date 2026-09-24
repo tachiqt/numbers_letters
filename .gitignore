@@ -1,11 +1,21 @@
-﻿# Local downloads and training artifacts
+﻿# Source video downloads (too large) — keep folder markers only
 raw/numbers/**
 !raw/numbers/.gitkeep
-data/**
-!data/.gitkeep
-trained_models/**
-!trained_models/.gitkeep
-!trained_models/*.pt
+raw/drive_download/
+raw/drive_numbers/
+
+# Built specialist NPZs + CSVs are tracked under data/train|val
+data/_drive_cache/
+
+# Training noise
+trained_models/*.log
+trained_models/preprocess_*.log
+trained_models/train_*.log
+trained_models/MediaPipeLSTM_last.pt
+trained_models/MediaPipeLSTM_best_pre_japorton_retest.pt
+trained_models/MediaPipeLSTM_numbers_letters_init.pt
+trained_models/_best_epoch.py
 __pycache__/
 *.pyc
 .venv/
+.DS_Store
